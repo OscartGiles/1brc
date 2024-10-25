@@ -1,6 +1,7 @@
 use core::f64;
+use rustc_hash::FxHashMap;
+use std::env;
 use std::{
-    collections::HashMap,
     fs::File,
     io::{BufRead, BufReader},
 };
@@ -57,7 +58,7 @@ fn one_million_rows(file_name: &str) -> Result<String, Box<dyn std::error::Error
     let mut reader = BufReader::new(f);
     let mut line = String::new();
 
-    let mut stations: HashMap<String, StationStats> = HashMap::new();
+    let mut stations: FxHashMap<String, StationStats> = FxHashMap::default();
 
     while let Ok(n_bytes) = reader.read_line(&mut line) {
         if !line.is_empty() {
@@ -67,9 +68,7 @@ fn one_million_rows(file_name: &str) -> Result<String, Box<dyn std::error::Error
 
             let value = reading.trim().parse::<f64>()?;
 
-            let station = stations
-                .entry(station_name.to_string())
-                .or_insert(StationStats::default());
+            let station = stations.entry(station_name.to_string()).or_default();
             station.update(value);
         }
         line.clear(); // Clear the string buffer
@@ -79,9 +78,7 @@ fn one_million_rows(file_name: &str) -> Result<String, Box<dyn std::error::Error
         }
     }
 
-    let mut ordered_stations: Vec<(String, StationStats)> =
-        stations.into_iter().map(|v| v).collect();
-
+    let mut ordered_stations: Vec<(String, StationStats)> = stations.into_iter().collect();
     ordered_stations.sort_by(|a, b| a.0.cmp(&b.0));
 
     let mut result = Vec::new();
@@ -108,14 +105,23 @@ fn round_output(value: f64) -> f64 {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let res = one_million_rows("measurements.txt")?;
-    println!("{}", res);
+    let args: Vec<String> = env::args().collect();
+
+    match args.len() {
+        2 => {
+            let res = one_million_rows(&args[1])?;
+            println!("{}", res);
+        }
+        _ => panic!("Only expected one argument"),
+    }
     Ok(())
 }
 
 #[cfg(test)]
 mod tests {
-    use std::{collections::HashSet, error::Error, fs, path::PathBuf};
+    use std::{error::Error, fs, path::PathBuf};
+
+    use rustc_hash::FxHashSet;
 
     use crate::one_million_rows;
 
@@ -123,7 +129,7 @@ mod tests {
         let dir = PathBuf::from("samples");
 
         // Use a HashSet to collect unique file stems (without extensions)
-        let mut unique_files = HashSet::new();
+        let mut unique_files = FxHashSet::default();
 
         // Iterate over the directory entries and collect unique file stems
         for entry in fs::read_dir(&dir)? {
