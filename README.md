@@ -23,3 +23,13 @@ Benchmark 1: ./target/release/brc_stackyak measurements_1_000_000.txt
   measurements_100_000_000.txt
   Time (mean ± σ):     18.899 s ±  0.125 s    [User: 18.495 s, System: 0.343 s]
   Range (min … max):   18.749 s … 19.119 s    10 runs
+
+## 3. Use mmap
+
+Benchmark 1: ./target/release/brc_stackyak measurements_1_000_000.txt
+  Time (mean ± σ):     203.4 ms ±   2.0 ms    [User: 195.3 ms, System: 6.0 ms]
+  Range (min … max):   201.0 ms … 208.7 ms    14 runs
+
+Benchmark 1: ./target/release/brc_stackyak measurements_100_000_000.txt
+  Time (mean ± σ):     18.894 s ±  0.266 s    [User: 18.462 s, System: 0.372 s]
+  Range (min … max):   18.507 s … 19.306 s    10 runs

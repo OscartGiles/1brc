@@ -1,10 +1,9 @@
 use core::f64;
+use memmap2::Mmap;
 use rustc_hash::FxHashMap;
 use std::env;
-use std::{
-    fs::File,
-    io::{BufRead, BufReader},
-};
+use std::io::Cursor;
+use std::{fs::File, io::BufRead};
 
 #[derive(Debug)]
 struct StationStats {
@@ -55,7 +54,9 @@ impl StationStats {
 
 fn one_million_rows(file_name: &str) -> Result<String, Box<dyn std::error::Error>> {
     let f = File::open(file_name)?;
-    let mut reader = BufReader::new(f);
+    let mmap = unsafe { Mmap::map(&f)? };
+    let mut reader = Cursor::new(mmap);
+
     let mut line = String::new();
 
     let mut stations: FxHashMap<String, StationStats> = FxHashMap::default();
