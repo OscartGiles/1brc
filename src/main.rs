@@ -1,4 +1,5 @@
 use core::f64;
+use memchr::{memchr, memchr_iter};
 use memmap2::Mmap;
 use rustc_hash::FxHashMap;
 use std::env;
@@ -58,20 +59,26 @@ fn one_million_rows(file_name: &str) -> Result<String, Box<dyn std::error::Error
 
     let mut stations: FxHashMap<&[u8], StationStats> = FxHashMap::default();
 
-    for line in mmap.split(|&byte| byte == b'\n') {
+    let line_breaks = memchr_iter(b'\n', &mmap);
+    let mut cursor: usize = 0;
+
+    for new_line_index in line_breaks {
+        let line = &mmap[cursor..new_line_index];
         if !line.is_empty() {
-            let mut line_iter = line.rsplit(|&byte| byte == b';');
+            if let Some(index) = memchr(b';', line) {
+                let (station_name, reading) = line.split_at(index);
 
-            let reading = line_iter.next().expect("line must be in format name:value");
-            let station_name = line_iter.next().expect("line must be in format name:value");
+                let value = unsafe { String::from_utf8_unchecked(reading[1..].to_owned()) }
+                    .trim()
+                    .parse::<f64>()?;
 
-            let value = unsafe { String::from_utf8_unchecked(reading.to_owned()) }
-                .trim()
-                .parse::<f64>()?;
-
-            let station = stations.entry(station_name).or_default();
-            station.update(value);
+                let station = stations.entry(station_name).or_default();
+                station.update(value);
+            }
         }
+
+        // Update the cursor position
+        cursor = new_line_index + 1;
     }
 
     let mut ordered_stations: Vec<(&[u8], StationStats)> = stations.into_iter().collect();
