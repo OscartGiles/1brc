@@ -2,6 +2,7 @@ use core::f64;
 use memmap2::Mmap;
 use rustc_hash::FxHashMap;
 use std::env;
+use std::fmt::Write;
 use std::fs::File;
 
 #[derive(Debug)]
@@ -76,20 +77,28 @@ fn one_million_rows(file_name: &str) -> Result<String, Box<dyn std::error::Error
     let mut ordered_stations: Vec<(&[u8], StationStats)> = stations.into_iter().collect();
     ordered_stations.sort_by(|a, b| a.0.cmp(&b.0));
 
-    let mut result = Vec::new();
+    let mut output = String::new();
+    output.push('{');
+
+    let mut first = true;
+
     for (station_name, stats) in ordered_stations {
-        result.push(format!(
+        if first {
+            first = false;
+        } else {
+            output.push_str(", ");
+        }
+        write!(
+            &mut output,
             "{}={:.1}/{:.1}/{:.1}",
             unsafe { String::from_utf8_unchecked(station_name.to_owned()) },
             round_output(stats.min),
             round_output(stats.average()),
             round_output(stats.max)
-        ));
+        )
+        .expect("Could not write to buffer");
     }
 
-    let mut output = String::new();
-    output.push('{');
-    output.push_str(&result.join(", "));
     output.push('}');
 
     Ok(output)

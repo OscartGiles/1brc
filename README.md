@@ -43,3 +43,15 @@ Benchmark 1: ./target/release/brc_stackyak measurements_1_000_000.txt
 Benchmark 1: ./target/release/brc_stackyak measurements_100_000_000.txt
   Time (mean ± σ):     19.027 s ±  0.096 s    [User: 18.509 s, System: 0.452 s]
   Range (min … max):   18.919 s … 19.212 s    10 runs
+
+## 4. Write to buffer
+
+Write to a buffer for results rather than appending strings.
+
+Benchmark 1: ./target/release/brc_stackyak measurements_1_000_000.txt
+  Time (mean ± σ):     134.4 ms ±   1.1 ms    [User: 128.0 ms, System: 4.7 ms]
+  Range (min … max):   132.6 ms … 136.9 ms    21 runs
+
+Benchmark 1: ./target/release/brc_stackyak measurements_100_000_000.txt
+  Time (mean ± σ):     12.496 s ±  0.164 s    [User: 12.041 s, System: 0.418 s]
+  Range (min … max):   12.321 s … 12.853 s    10 runs
