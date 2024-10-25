@@ -2,8 +2,7 @@ use core::f64;
 use memmap2::Mmap;
 use rustc_hash::FxHashMap;
 use std::env;
-use std::io::Cursor;
-use std::{fs::File, io::BufRead};
+use std::fs::File;
 
 #[derive(Debug)]
 struct StationStats {
@@ -55,38 +54,33 @@ impl StationStats {
 fn one_million_rows(file_name: &str) -> Result<String, Box<dyn std::error::Error>> {
     let f = File::open(file_name)?;
     let mmap = unsafe { Mmap::map(&f)? };
-    let mut reader = Cursor::new(mmap);
 
-    let mut line = String::new();
+    let mut stations: FxHashMap<&[u8], StationStats> = FxHashMap::default();
 
-    let mut stations: FxHashMap<String, StationStats> = FxHashMap::default();
-
-    while let Ok(n_bytes) = reader.read_line(&mut line) {
+    for line in mmap.split(|&byte| byte == b'\n') {
         if !line.is_empty() {
-            let (station_name, reading) = line
-                .split_once(";")
-                .expect("Row shoud be in format name;value");
+            let mut line_iter = line.rsplit(|&byte| byte == b';');
 
-            let value = reading.trim().parse::<f64>()?;
+            let reading = line_iter.next().expect("line must be in format name:value");
+            let station_name = line_iter.next().expect("line must be in format name:value");
 
-            let station = stations.entry(station_name.to_string()).or_default();
+            let value = unsafe { String::from_utf8_unchecked(reading.to_owned()) }
+                .trim()
+                .parse::<f64>()?;
+
+            let station = stations.entry(station_name).or_default();
             station.update(value);
-        }
-        line.clear(); // Clear the string buffer
-
-        if n_bytes == 0 {
-            break;
         }
     }
 
-    let mut ordered_stations: Vec<(String, StationStats)> = stations.into_iter().collect();
+    let mut ordered_stations: Vec<(&[u8], StationStats)> = stations.into_iter().collect();
     ordered_stations.sort_by(|a, b| a.0.cmp(&b.0));
 
     let mut result = Vec::new();
     for (station_name, stats) in ordered_stations {
         result.push(format!(
             "{}={:.1}/{:.1}/{:.1}",
-            station_name,
+            unsafe { String::from_utf8_unchecked(station_name.to_owned()) },
             round_output(stats.min),
             round_output(stats.average()),
             round_output(stats.max)
