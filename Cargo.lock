@@ -7,7 +7,6 @@ name = "brc_stackyak"
 version = "0.1.0"
 dependencies = [
  "crossbeam",
- "memchr",
  "memmap2",
  "rayon",
  "rustc-hash",
@@ -80,12 +79,6 @@ name = "libc"
 version = "0.2.161"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8e9489c2807c139ffd9c1794f4af0ebe86a828db53ecdc7fea2111d0fed085d1"
-
-[[package]]
-name = "memchr"
-version = "2.7.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "78ca9ab1a0babb1e7d5695e3530886289c18cf2f87ec19a575a0abdce112e3a3"
 
 [[package]]
 name = "memmap2"

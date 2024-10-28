@@ -1,6 +1,5 @@
 use core::f64;
 use crossbeam::channel;
-use memchr::{memchr, memchr_iter};
 use memmap2::Mmap;
 use rayon::current_num_threads;
 use rustc_hash::FxHashMap;
@@ -10,6 +9,7 @@ use std::fs::File;
 use std::sync::Arc;
 use std::{env, sync::Mutex};
 
+mod simd_memchr;
 #[derive(Debug)]
 struct StationStats {
     min: V,
@@ -112,13 +112,13 @@ fn one_million_rows(file_name: &str) -> Result<String, Box<dyn std::error::Error
                 let mut local_stations: FxHashMap<&[u8], StationStats> = FxHashMap::default();
 
                 while let Ok(batch) = trx.recv() {
-                    let line_breaks = memchr_iter(b'\n', batch);
+                    let line_breaks = simd_memchr::memchr_iter(b'\n', batch);
                     let mut cursor = 0;
                     for new_line_index in line_breaks {
                         let line = &batch[cursor..new_line_index];
 
                         if !line.is_empty() {
-                            if let Some(index) = memchr(b';', line) {
+                            if let Some(index) = simd_memchr::memchr(b';', line) {
                                 let (station_name, reading) = line.split_at(index);
 
                                 let value = parse_numeric(&reading[1..]);
@@ -150,8 +150,6 @@ fn one_million_rows(file_name: &str) -> Result<String, Box<dyn std::error::Error
         // Start reading task
         s.spawn(|_| {
             let tx = tx; // Move tx to ensure it gets dropped after all data is sent
-                         // let line_breaks = memchr_iter(b'\n', &mmap);
-
             let n_chunks = 12;
             let file_size = data.len();
             let chunk_size = (file_size / n_chunks).max(1);
@@ -167,7 +165,7 @@ fn one_million_rows(file_name: &str) -> Result<String, Box<dyn std::error::Error
                     // Otherwise look for the next newline in the remaining data
                     let remaining = &data[cursor + chunk_size..];
 
-                    if let Some(next_newline) = memchr(b'\n', remaining) {
+                    if let Some(next_newline) = simd_memchr::memchr(b'\n', remaining) {
                         slice_end += next_newline;
                         &data[cursor..cursor + chunk_size + next_newline + 1]
                     } else {
