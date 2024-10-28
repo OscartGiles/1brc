@@ -99,3 +99,13 @@ Benchmark 1: ./target/release/brc_stackyak measurements_1_000_000.txt
 Benchmark 1: ./target/release/brc_stackyak measurements_100_000_000.txt
   Time (mean ± σ):      1.464 s ±  0.090 s    [User: 15.782 s, System: 0.627 s]
   Range (min … max):    1.381 s …  1.665 s    10 runs
+
+## Build with native
+
+Benchmark 1: ./target/release/brc_stackyak measurements_1_000_000.txt
+  Time (mean ± σ):      32.3 ms ±   0.7 ms    [User: 154.1 ms, System: 18.2 ms]
+  Range (min … max):    30.7 ms …  34.1 ms    81 runs
+
+Benchmark 1: ./target/release/brc_stackyak measurements_100_000_000.txt
+  Time (mean ± σ):      1.423 s ±  0.033 s    [User: 15.459 s, System: 0.633 s]
+  Range (min … max):    1.393 s …  1.495 s    10 runs
