@@ -78,7 +78,7 @@ Benchmark 1: ./target/release/brc_stackyak measurements_100_000_000.txt
   Time (mean ± σ):      3.410 s ±  0.136 s    [User: 37.013 s, System: 0.827 s]
   Range (min … max):    3.140 s …  3.586 s    10 runs
 
-## Custom parse
+## Custom parser
 
 Tests are failing because of rounding error
 
@@ -89,3 +89,13 @@ Benchmark 1: ./target/release/brc_stackyak measurements_1_000_000.txt
 Benchmark 1: ./target/release/brc_stackyak measurements_100_000_000.txt
   Time (mean ± σ):      1.553 s ±  0.025 s    [User: 16.942 s, System: 0.713 s]
   Range (min … max):    1.526 s …  1.596 s    10 runs
+
+## Inline stuff and configure build
+
+Benchmark 1: ./target/release/brc_stackyak measurements_1_000_000.txt
+  Time (mean ± σ):      32.3 ms ±   0.7 ms    [User: 157.0 ms, System: 17.9 ms]
+  Range (min … max):    31.0 ms …  35.1 ms    80 runs
+
+Benchmark 1: ./target/release/brc_stackyak measurements_100_000_000.txt
+  Time (mean ± σ):      1.464 s ±  0.090 s    [User: 15.782 s, System: 0.627 s]
+  Range (min … max):    1.381 s …  1.665 s    10 runs

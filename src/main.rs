@@ -66,6 +66,7 @@ impl StationStats {
 
 type V = i32;
 /// Parse to an i32 with single digit precision
+#[inline(always)]
 fn parse_numeric(val: &[u8]) -> V {
     let mut num: V = V::default();
     let mut negative = 1;
@@ -86,6 +87,7 @@ fn parse_numeric(val: &[u8]) -> V {
     }
 }
 
+#[inline(always)]
 fn format_val(val: V) -> String {
     format!("{:.1}", val as f64 / 10.0)
 }
@@ -214,6 +216,7 @@ fn one_million_rows(file_name: &str) -> Result<String, Box<dyn std::error::Error
     Ok(output)
 }
 
+#[inline(always)]
 fn round_output(value: f64) -> f64 {
     (value * 10.0).ceil() / 10.0
 }

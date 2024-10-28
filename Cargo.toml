@@ -9,3 +9,9 @@ memchr = "2.7.4"
 memmap2 = "0.9.5"
 rayon = "1.10.0"
 rustc-hash = "2.0.0"
+
+
+[profile.release]
+codegen-units = 1
+lto = "fat"
+panic = "abort"
