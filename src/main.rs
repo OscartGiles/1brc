@@ -12,37 +12,37 @@ use std::{env, sync::Mutex};
 
 #[derive(Debug)]
 struct StationStats {
-    min: f64,
-    max: f64,
+    min: V,
+    max: V,
     count: u64,
-    sum: f64,
+    sum: V,
 }
 
 impl Default for StationStats {
     fn default() -> Self {
         StationStats {
-            min: f64::MAX,
-            max: f64::MIN,
+            min: V::MAX,
+            max: V::MIN,
             count: 0,
-            sum: 0.0,
+            sum: V::default(),
         }
     }
 }
 
 impl StationStats {
-    fn update_min(&mut self, value: f64) {
+    fn update_min(&mut self, value: V) {
         self.min = self.min.min(value);
     }
 
-    fn update_max(&mut self, value: f64) {
+    fn update_max(&mut self, value: V) {
         self.max = self.max.max(value);
     }
-    fn update_sum(&mut self, value: f64) {
+    fn update_sum(&mut self, value: V) {
         self.sum += value;
         self.count += 1;
     }
 
-    pub fn update(&mut self, value: f64) {
+    pub fn update(&mut self, value: V) {
         self.update_min(value);
         self.update_max(value);
         self.update_sum(value);
@@ -52,7 +52,7 @@ impl StationStats {
         if self.count == 0 {
             0.0
         } else {
-            self.sum / self.count as f64
+            self.sum as f64 / 10.0 / self.count as f64
         }
     }
 
@@ -62,6 +62,32 @@ impl StationStats {
         self.sum += other.sum;
         self.count += other.count;
     }
+}
+
+type V = i32;
+/// Parse to an i32 with single digit precision
+fn parse_numeric(val: &[u8]) -> V {
+    let mut num: V = V::default();
+    let mut negative = 1;
+    let mut has_decimal = false;
+
+    for v in val.iter() {
+        match v {
+            b'.' => has_decimal = true,
+            b'-' => negative = -1,
+            _ => num = num * 10 + (v - b'0') as V,
+        }
+    }
+
+    if has_decimal {
+        negative * num
+    } else {
+        negative * num * 10
+    }
+}
+
+fn format_val(val: V) -> String {
+    format!("{:.1}", val as f64 / 10.0)
 }
 
 fn one_million_rows(file_name: &str) -> Result<String, Box<dyn std::error::Error>> {
@@ -92,12 +118,8 @@ fn one_million_rows(file_name: &str) -> Result<String, Box<dyn std::error::Error
                         if !line.is_empty() {
                             if let Some(index) = memchr(b';', line) {
                                 let (station_name, reading) = line.split_at(index);
-                                let value =
-                                    unsafe { String::from_utf8_unchecked(reading[1..].to_owned()) }
-                                        .trim()
-                                        .parse::<f64>()
-                                        .unwrap();
 
+                                let value = parse_numeric(&reading[1..]);
                                 let station = local_stations.entry(station_name).or_default();
                                 station.update(value);
                             }
@@ -178,11 +200,11 @@ fn one_million_rows(file_name: &str) -> Result<String, Box<dyn std::error::Error
         }
         write!(
             &mut output,
-            "{}={:.1}/{:.1}/{:.1}",
+            "{}={}/{:.1}/{}",
             unsafe { String::from_utf8_unchecked(station_name.to_owned()) },
-            round_output(stats.min),
+            format_val(stats.min),
             round_output(stats.average()),
-            round_output(stats.max)
+            format_val(stats.max)
         )
         .expect("Could not write to buffer");
     }
@@ -215,7 +237,7 @@ mod tests {
 
     use rustc_hash::FxHashSet;
 
-    use crate::one_million_rows;
+    use crate::{format_val, one_million_rows, parse_numeric};
 
     fn test_samples() -> Result<Vec<(PathBuf, PathBuf)>, Box<dyn Error>> {
         let dir = PathBuf::from("samples");
@@ -260,5 +282,19 @@ mod tests {
         }
 
         Ok(())
+    }
+
+    #[test]
+    fn test_custom_parse() {
+        assert_eq!(124.2, parse_numeric("124.2".as_bytes()) as f64 / 10.0);
+        assert_eq!(10.5, parse_numeric("10.5".as_bytes()) as f64 / 10.0);
+
+        assert_eq!(4.0, parse_numeric("4".as_bytes()) as f64 / 10.0);
+        assert_eq!(42.0, parse_numeric("42".as_bytes()) as f64 / 10.0);
+
+        assert_eq!(-53.3, parse_numeric("-53.3".as_bytes()) as f64 / 10.0);
+        assert_eq!(-53.0, parse_numeric("-53".as_bytes()) as f64 / 10.0);
+
+        assert_eq!("1.0", format_val(parse_numeric("1.0".as_bytes())));
     }
 }
