@@ -1,10 +1,14 @@
 use core::f64;
+use crossbeam::channel;
 use memchr::{memchr, memchr_iter};
 use memmap2::Mmap;
+use rayon::current_num_threads;
 use rustc_hash::FxHashMap;
-use std::env;
+use std::collections::hash_map::Entry;
 use std::fmt::Write;
 use std::fs::File;
+use std::sync::Arc;
+use std::{env, sync::Mutex};
 
 #[derive(Debug)]
 struct StationStats {
@@ -51,38 +55,115 @@ impl StationStats {
             self.sum / self.count as f64
         }
     }
+
+    pub fn merge(&mut self, other: &Self) {
+        self.min = self.min.min(other.min);
+        self.max = self.max.max(other.max);
+        self.sum += other.sum;
+        self.count += other.count;
+    }
 }
 
 fn one_million_rows(file_name: &str) -> Result<String, Box<dyn std::error::Error>> {
     let f = File::open(file_name)?;
-    let mmap = unsafe { Mmap::map(&f)? };
+    let data = unsafe { Mmap::map(&f)? };
 
-    let mut stations: FxHashMap<&[u8], StationStats> = FxHashMap::default();
+    let (tx, rx) = channel::bounded::<&[u8]>(100000);
 
-    let line_breaks = memchr_iter(b'\n', &mmap);
-    let mut cursor: usize = 0;
+    let all_stations = rayon::scope(|s| {
+        let all_stations: Arc<Mutex<FxHashMap<&[u8], StationStats>>> =
+            Arc::new(Mutex::new(FxHashMap::default()));
 
-    for new_line_index in line_breaks {
-        let line = &mmap[cursor..new_line_index];
-        if !line.is_empty() {
-            if let Some(index) = memchr(b';', line) {
-                let (station_name, reading) = line.split_at(index);
+        // Start worker tasks
+        for _ in 0..current_num_threads() {
+            let trx = rx.clone();
 
-                let value = unsafe { String::from_utf8_unchecked(reading[1..].to_owned()) }
-                    .trim()
-                    .parse::<f64>()?;
+            let all_stations_local = all_stations.clone();
 
-                let station = stations.entry(station_name).or_default();
-                station.update(value);
-            }
+            s.spawn(move |_| {
+                let mut local_stations: FxHashMap<&[u8], StationStats> = FxHashMap::default();
+
+                while let Ok(batch) = trx.recv() {
+                    let line_breaks = memchr_iter(b'\n', batch);
+                    let mut cursor = 0;
+                    for new_line_index in line_breaks {
+                        let line = &batch[cursor..new_line_index];
+
+                        if !line.is_empty() {
+                            if let Some(index) = memchr(b';', line) {
+                                let (station_name, reading) = line.split_at(index);
+                                let value =
+                                    unsafe { String::from_utf8_unchecked(reading[1..].to_owned()) }
+                                        .trim()
+                                        .parse::<f64>()
+                                        .unwrap();
+
+                                let station = local_stations.entry(station_name).or_default();
+                                station.update(value);
+                            }
+                        }
+                        cursor = new_line_index + 1;
+                    }
+                }
+
+                // Merge into the global map
+                let mut global_map = all_stations_local.lock().unwrap();
+
+                for (key, val) in local_stations {
+                    match global_map.entry(key) {
+                        Entry::Occupied(mut entry) => {
+                            let station = entry.get_mut();
+                            station.merge(&val);
+                        }
+                        Entry::Vacant(entry) => {
+                            entry.insert(val);
+                        }
+                    }
+                }
+            })
         }
 
-        // Update the cursor position
-        cursor = new_line_index + 1;
-    }
+        // Start reading task
+        s.spawn(|_| {
+            let tx = tx; // Move tx to ensure it gets dropped after all data is sent
+                         // let line_breaks = memchr_iter(b'\n', &mmap);
+
+            let n_chunks = 12;
+            let file_size = data.len();
+            let chunk_size = (file_size / n_chunks).max(1);
+            let mut cursor: usize = 0;
+
+            while cursor < file_size {
+                // Propose a slice
+                let mut slice_end = (cursor + chunk_size).min(file_size); //exclusive bound
+                let slice = &data[cursor..slice_end];
+                let accepted_slice = if slice[slice.len() - 1] == b'\n' {
+                    slice
+                } else {
+                    // Otherwise look for the next newline in the remaining data
+                    let remaining = &data[cursor + chunk_size..];
+
+                    if let Some(next_newline) = memchr(b'\n', remaining) {
+                        slice_end += next_newline;
+                        &data[cursor..cursor + chunk_size + next_newline + 1]
+                    } else {
+                        &data[cursor..]
+                    }
+                };
+
+                cursor = slice_end;
+                tx.send(accepted_slice).expect("Channel must be open");
+            }
+        });
+
+        all_stations
+    });
+
+    // Unwrap the vector of results from the Arc<Mutex<...>>
+    let stations = Arc::try_unwrap(all_stations).unwrap().into_inner().unwrap();
 
     let mut ordered_stations: Vec<(&[u8], StationStats)> = stations.into_iter().collect();
-    ordered_stations.sort_by(|a, b| a.0.cmp(&b.0));
+    ordered_stations.sort_by(|a, b| a.0.cmp(b.0));
 
     let mut output = String::new();
     output.push('{');

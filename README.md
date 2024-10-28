@@ -65,3 +65,15 @@ Benchmark 1: ./target/release/brc_stackyak measurements_1_000_000.txt
 Benchmark 1: ./target/release/brc_stackyak measurements_100_000_000.txt
   Time (mean ± σ):     12.282 s ±  0.348 s    [User: 11.773 s, System: 0.427 s]
   Range (min … max):   11.982 s … 12.970 s    10 runs
+
+## Parallel
+
+At first things were just as slow. Realised I had a print statement which locks stdout causing threads to block. Oppps.
+
+Benchmark 1: ./target/release/brc_stackyak measurements_1_000_000.txt
+  Time (mean ± σ):      41.7 ms ±   1.0 ms    [User: 279.4 ms, System: 18.2 ms]
+  Range (min … max):    40.0 ms …  45.0 ms    68 runs
+
+Benchmark 1: ./target/release/brc_stackyak measurements_100_000_000.txt
+  Time (mean ± σ):      3.410 s ±  0.136 s    [User: 37.013 s, System: 0.827 s]
+  Range (min … max):    3.140 s …  3.586 s    10 runs
