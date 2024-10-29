@@ -135,19 +135,5 @@ mod tests {
         let expected_index = line_iterator.collect::<Vec<_>>();
 
         assert_eq!(all_index, expected_index);
-
-        // let mut cursor = 0;
-        // while let Some(line_idx) = mechr_iterator.next() {
-        //     let line = &f[cursor..line_idx];
-        //     println!("{}", line.len());
-        //     println!("{}", String::from_utf8(line.to_vec()).unwrap());
-        //     cursor += line_idx; // Add one to skip the new line
-        // }
-        // assert_eq!(Some(2), mechr_iterator.next());
-        // println!("{:?}", mechr_iterator);
-        // assert_eq!(Some(5), mechr_iterator.next());
-        // assert_eq!(Some(6), mechr_iterator.next());
-        // assert_eq!(Some(8), mechr_iterator.next());
-        // assert_eq!(None, mechr_iterator.next());
     }
 }
