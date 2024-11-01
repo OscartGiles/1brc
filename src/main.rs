@@ -1,12 +1,12 @@
 use core::f64;
 use crossbeam::channel;
 use memmap2::Mmap;
-use rayon::current_num_threads;
 use rustc_hash::FxHashMap;
 use std::collections::hash_map::Entry;
 use std::fmt::Write;
 use std::fs::File;
 use std::sync::Arc;
+use std::thread;
 use std::{env, sync::Mutex};
 
 mod simd_memchr;
@@ -98,38 +98,38 @@ fn one_million_rows(file_name: &str) -> Result<String, Box<dyn std::error::Error
 
     let (tx, rx) = channel::bounded::<&[u8]>(100000);
 
-    let all_stations = rayon::scope(|s| {
+    let all_stations = thread::scope(|s| {
         let all_stations: Arc<Mutex<FxHashMap<&[u8], StationStats>>> =
             Arc::new(Mutex::new(FxHashMap::default()));
 
         // Start worker tasks
-        for _ in 0..current_num_threads() {
+        for _ in 0..thread::available_parallelism().unwrap().into() {
             let trx = rx.clone();
 
             let all_stations_local = all_stations.clone();
 
-            s.spawn(move |_| {
+            s.spawn(move || {
                 let mut local_stations: FxHashMap<&[u8], StationStats> = FxHashMap::default();
 
                 while let Ok(batch) = trx.recv() {
                     let line_breaks = simd_memchr::memchr_iter(b'\n', batch);
                     let mut cursor = 0;
                     for new_line_index in line_breaks {
-                        let line = &batch[cursor..new_line_index];
+                        let line = unsafe { &batch.get_unchecked(cursor..new_line_index) };
 
                         if !line.is_empty() {
                             if let Some(index) = simd_memchr::memchr(b';', line) {
                                 let (station_name, reading) = line.split_at(index);
 
-                                let value = parse_numeric(&reading[1..]);
+                                let value = parse_numeric(unsafe { &reading.get_unchecked(1..) });
                                 let station = local_stations.entry(station_name).or_default();
                                 station.update(value);
                             }
                         }
+
                         cursor = new_line_index + 1;
                     }
                 }
-
                 // Merge into the global map
                 let mut global_map = all_stations_local.lock().unwrap();
 
@@ -144,13 +144,13 @@ fn one_million_rows(file_name: &str) -> Result<String, Box<dyn std::error::Error
                         }
                     }
                 }
-            })
+            });
         }
 
         // Start reading task
-        s.spawn(|_| {
+        s.spawn(|| {
             let tx = tx; // Move tx to ensure it gets dropped after all data is sent
-            let n_chunks = 12;
+            let n_chunks: usize = thread::available_parallelism().unwrap().into();
             let file_size = data.len();
             let chunk_size = (file_size / n_chunks).max(1);
             let mut cursor: usize = 0;
@@ -158,8 +158,10 @@ fn one_million_rows(file_name: &str) -> Result<String, Box<dyn std::error::Error
             while cursor < file_size {
                 // Propose a slice
                 let mut slice_end = (cursor + chunk_size).min(file_size); //exclusive bound
-                let slice = &data[cursor..slice_end];
-                let accepted_slice = if slice[slice.len() - 1] == b'\n' {
+
+                let slice = unsafe { &data.get_unchecked(cursor..slice_end) };
+
+                let accepted_slice = if unsafe { *slice.get_unchecked(slice.len() - 1) } == b'\n' {
                     slice
                 } else {
                     // Otherwise look for the next newline in the remaining data
@@ -167,9 +169,11 @@ fn one_million_rows(file_name: &str) -> Result<String, Box<dyn std::error::Error
 
                     if let Some(next_newline) = simd_memchr::memchr(b'\n', remaining) {
                         slice_end += next_newline;
-                        &data[cursor..cursor + chunk_size + next_newline + 1]
+                        unsafe {
+                            &data.get_unchecked(cursor..cursor + chunk_size + next_newline + 1)
+                        }
                     } else {
-                        &data[cursor..]
+                        unsafe { &data.get_unchecked(cursor..) }
                     }
                 };
 

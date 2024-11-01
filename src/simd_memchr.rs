@@ -65,7 +65,8 @@ impl<'a> Iterator for Memchr<'a> {
             // If there are less than 32 bytes then process remaining without simd
             // to avoid out of bounds read.
             if haystack_len - self.index >= mask_size {
-                let ptr = self.haystack[self.index..].as_ptr() as *const __m256i;
+                let ptr =
+                    unsafe { self.haystack.get_unchecked(self.index..).as_ptr() as *const __m256i };
                 unsafe {
                     let haystack_vec = _mm256_loadu_si256(ptr);
                     let cmp_vec = _mm256_cmpeq_epi8(self.needle_vec, haystack_vec);
@@ -81,8 +82,10 @@ impl<'a> Iterator for Memchr<'a> {
                 }
             } else {
                 self.index += 1;
-                if self.haystack[self.index - 1] == self.needle {
-                    return Some(self.index - 1);
+                unsafe {
+                    if *self.haystack.get_unchecked(self.index - 1) == self.needle {
+                        return Some(self.index - 1);
+                    }
                 }
             }
         }
