@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 crossbeam = { version = "0.8.4", features = ["crossbeam-channel"] }
+memchr = "2.7.4"
 memmap2 = "0.9.5"
 rustc-hash = "2.0.0"
 

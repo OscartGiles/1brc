@@ -9,7 +9,6 @@ use std::sync::Arc;
 use std::thread;
 use std::{env, sync::Mutex};
 
-mod simd_memchr;
 #[derive(Debug)]
 struct StationStats {
     min: V,
@@ -112,13 +111,13 @@ fn one_million_rows(file_name: &str) -> Result<String, Box<dyn std::error::Error
                 let mut local_stations: FxHashMap<&[u8], StationStats> = FxHashMap::default();
 
                 while let Ok(batch) = trx.recv() {
-                    let line_breaks = simd_memchr::memchr_iter(b'\n', batch);
+                    let line_breaks = memchr::memchr_iter(b'\n', batch);
                     let mut cursor = 0;
                     for new_line_index in line_breaks {
                         let line = unsafe { &batch.get_unchecked(cursor..new_line_index) };
 
                         if !line.is_empty() {
-                            if let Some(index) = simd_memchr::memchr(b';', line) {
+                            if let Some(index) = memchr::memchr(b';', line) {
                                 let (station_name, reading) = line.split_at(index);
 
                                 let value = parse_numeric(unsafe { &reading.get_unchecked(1..) });
@@ -167,7 +166,7 @@ fn one_million_rows(file_name: &str) -> Result<String, Box<dyn std::error::Error
                     // Otherwise look for the next newline in the remaining data
                     let remaining = &data[cursor + chunk_size..];
 
-                    if let Some(next_newline) = simd_memchr::memchr(b'\n', remaining) {
+                    if let Some(next_newline) = memchr::memchr(b'\n', remaining) {
                         slice_end += next_newline;
                         unsafe {
                             &data.get_unchecked(cursor..cursor + chunk_size + next_newline + 1)
